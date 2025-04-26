@@ -7,22 +7,19 @@ import json
 import datetime
 import threading
 import queue
+import math
 
 class VoiceHandler:
     def __init__(self, gui):
         self.recognizer = sr.Recognizer()
         self.engine = pyttsx3.init()
-
-        # Set a deeper, slower JARVIS-like voice
         voices = self.engine.getProperty('voices')
         for voice in voices:
             if 'male' in voice.name.lower() or 'en' in voice.id.lower():
                 self.engine.setProperty('voice', voice.id)
                 break
-
-        self.engine.setProperty('rate', 140)   # slower for robotic feel
-        self.engine.setProperty('volume', 1.0) # maximum volume
-
+        self.engine.setProperty('rate', 140)
+        self.engine.setProperty('volume', 1.0)
         self.engine.connect('started-utterance', gui.start_speaking)
         self.engine.connect('finished-utterance', gui.stop_speaking)
 
@@ -58,8 +55,9 @@ class AssistantGUI:
         self.canvas.pack(pady=10)
 
         self.state = "idle"  # idle, listening, speaking
-        self.bars = []
-        self.create_bars()
+        self.bubble = None
+        self.bubble_phase = 0  # Single phase for one bubble
+        self.create_bubble()
 
         self.voice_handler = VoiceHandler(self)
         self.response_queue = queue.Queue()
@@ -68,32 +66,47 @@ class AssistantGUI:
         self.root.after(100, self.check_queue)
         threading.Thread(target=self.listen_loop, daemon=True).start()
 
-    def create_bars(self):
-        self.bars.clear()
-        bar_width = 10
-        spacing = 8
-        for i in range(20):
-            x0 = i * (bar_width + spacing) + 20
-            y0 = 75
-            x1 = x0 + bar_width
-            y1 = y0 - 20
-            bar = self.canvas.create_rectangle(x0, y0, x1, y1, fill="#6441a5", width=0)
-            self.bars.append(bar)
+    def create_bubble(self):
+        # Create a single centered bubble
+        x = 200  # Center of canvas (400/2)
+        y = 75   # Center of canvas (150/2)
+        size = 20  # Base size
+        self.bubble = self.canvas.create_oval(
+            x - size, y - size, x + size, y + size,
+            fill="#6441a5", outline="", tags="bubble"
+        )
+        self.bubble_phase = random.uniform(0, 2 * math.pi)  # Random initial phase
 
     def animate(self):
-        for idx, bar in enumerate(self.bars):
-            if self.state == "idle":
-                height = 20
-            elif self.state == "listening":
-                height = random.randint(20, 50)
-            elif self.state == "speaking":
-                height = random.randint(40, 100)
-            else:
-                height = 20
+        x1, y1, x2, y2 = self.canvas.coords(self.bubble)
+        center_x = (x1 + x2) / 2
+        center_y = (y1 + y2) / 2
+        base_size = (x2 - x1) / 2  # Current radius
 
-            x0, y0, x1, y1 = self.canvas.coords(bar)
-            self.canvas.coords(bar, x0, 130, x1, 130 - height)
-        self.root.after(100, self.animate)
+        if self.state == "idle":
+            size_variation = 5 * math.sin(self.bubble_phase)
+            new_size = base_size + size_variation
+            color = "#4b367c"  # Darker, less vibrant
+        elif self.state == "listening":
+            size_variation = 10 * math.sin(self.bubble_phase * 1.5)
+            new_size = base_size + size_variation
+            color = "#6441a5"  # Brighter
+        elif self.state == "speaking":
+            size_variation = 15 * math.sin(self.bubble_phase * 2)
+            new_size = base_size + size_variation
+            color = "#8964d1"  # Most vibrant
+        else:
+            new_size = base_size
+            color = "#4b367c"
+
+        # Update bubble size
+        self.canvas.coords(self.bubble,
+                           center_x - new_size, center_y - new_size,
+                           center_x + new_size, center_y + new_size)
+        self.canvas.itemconfig(self.bubble, fill=color)
+        self.bubble_phase += 0.1  # Increment phase
+
+        self.root.after(50, self.animate)
 
     def start_speaking(self, name=None, data=None):
         self.state = "speaking"
@@ -142,11 +155,10 @@ class AssistantGUI:
         self.root.after(100, self.check_queue)
 
 def get_llm_response(query):
-    api_key = "your-groq-api-key"  # Replace with your actual API key
+    api_key = "your_groq_api_key"  # Replace with your actual API key
     if not api_key:
         print("Please set the GROQ_API_KEY environment variable.")
         return None
-
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {api_key}",
