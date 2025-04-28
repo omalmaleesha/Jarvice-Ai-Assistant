@@ -62,12 +62,25 @@ class AssistantGUI:
         self.voice_handler = VoiceHandler(self)
         self.response_queue = queue.Queue()
 
+        # Load conversation history
+        self.conversation_history = self.load_conversation_history()
+
+        # Startup greeting
+        self.startup_greeting()
+
         self.animate()
         self.root.after(100, self.check_queue)
         threading.Thread(target=self.listen_loop, daemon=True).start()
 
+    def load_conversation_history(self):
+        try:
+            with open("conversation_history.json", "r") as f:
+                history = json.load(f)
+                return {entry["query"].lower(): entry["response"] for entry in history}
+        except FileNotFoundError:
+            return {}
+
     def create_bubble(self):
-        # Create a single centered bubble
         x = 200  # Center of canvas (400/2)
         y = 75   # Center of canvas (150/2)
         size = 20  # Base size
@@ -99,7 +112,6 @@ class AssistantGUI:
             new_size = base_size
             color = "#4b367c"
 
-        # Update bubble size
         self.canvas.coords(self.bubble,
                            center_x - new_size, center_y - new_size,
                            center_x + new_size, center_y + new_size)
@@ -113,6 +125,18 @@ class AssistantGUI:
 
     def stop_speaking(self, name=None, data=None):
         self.state = "idle"
+
+    def startup_greeting(self):
+        current_time = datetime.datetime.now().strftime("%I:%M %p")
+        hour = datetime.datetime.now().hour
+        if hour < 12:
+            greeting = "Good morning"
+        elif hour < 18:
+            greeting = "Good afternoon"
+        else:
+            greeting = "Good evening"
+        message = f"{greeting}, it's {current_time}. I am JARVIS, your assistant."
+        self.voice_handler.speak(message)
 
     def listen_loop(self):
         while True:
@@ -135,18 +159,22 @@ class AssistantGUI:
                 self.state = "idle"
 
     def get_response(self, query):
-        response = get_llm_response(query)
-        if response:
-            self.response_queue.put((query, response))
+        query_lower = query.lower()
+        if query_lower in self.conversation_history:
+            response = self.conversation_history[query_lower]
         else:
-            error_message = "I'm sorry, I couldn't process that."
-            self.response_queue.put((query, error_message))
+            response = get_llm_response(query)
+            if response:
+                self.conversation_history[query_lower] = response
+                log_conversation(query, response)
+            else:
+                response = "I'm sorry, I couldn't process that."
+        self.response_queue.put((query, response))
 
     def check_queue(self):
         try:
             query, response = self.response_queue.get_nowait()
             self.status_label.config(text="Speaking...")
-            log_conversation(query, response)
             self.voice_handler.speak(response)
             self.status_label.config(text="Ready")
             self.state = "idle"
@@ -155,7 +183,7 @@ class AssistantGUI:
         self.root.after(100, self.check_queue)
 
 def get_llm_response(query):
-    api_key = "your_groq_api_key"  # Replace with your actual API key
+    api_key = "your_api_key"  # Replace with your actual API key
     if not api_key:
         print("Please set the GROQ_API_KEY environment variable.")
         return None
