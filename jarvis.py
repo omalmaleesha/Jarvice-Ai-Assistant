@@ -216,7 +216,7 @@ class AssistantGUI:
         self.root.after(100, self.check_queue)
 
 def get_llm_response(query):
-    api_key = "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"  # Replace with your actual API key
+    api_key = "your_groq_api"  # Replace with your actual API key
     if not api_key:
         print("Please set the GROQ_API_KEY environment variable.")
         return None
