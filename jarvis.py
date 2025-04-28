@@ -11,7 +11,13 @@ import math
 
 class VoiceHandler:
     def __init__(self, gui):
+        self.gui = gui
         self.recognizer = sr.Recognizer()
+        self.speak_queue = queue.Queue()
+        threading.Thread(target=self.speak_loop, daemon=True).start()
+
+    def speak_loop(self):
+        """Initialize and run the pyttsx3 engine in a dedicated thread."""
         self.engine = pyttsx3.init()
         voices = self.engine.getProperty('voices')
         for voice in voices:
@@ -20,10 +26,29 @@ class VoiceHandler:
                 break
         self.engine.setProperty('rate', 140)
         self.engine.setProperty('volume', 1.0)
-        self.engine.connect('started-utterance', gui.start_speaking)
-        self.engine.connect('finished-utterance', gui.stop_speaking)
+        self.engine.connect('started-utterance', self.on_start_utterance)
+        self.engine.connect('finished-utterance', self.on_finish_utterance)
+        while True:
+            text = self.speak_queue.get()
+            if text is None:  # Exit signal
+                break
+            self.engine.say(text)
+            self.engine.runAndWait()
+
+    def on_start_utterance(self, name):
+        """Marshal the start speaking callback to the main thread."""
+        self.gui.root.after(0, self.gui.start_speaking, name)
+
+    def on_finish_utterance(self, name, completed):
+        """Marshal the stop speaking callback to the main thread."""
+        self.gui.root.after(0, self.gui.stop_speaking, name, completed)
+
+    def speak(self, text):
+        """Queue text to be spoken by the speaking thread."""
+        self.speak_queue.put(text)
 
     def listen(self):
+        """Handle audio input in the listening thread."""
         with sr.Microphone() as source:
             self.recognizer.adjust_for_ambient_noise(source, duration=0.5)
             print("Listening...")
@@ -36,9 +61,9 @@ class VoiceHandler:
                 print("Could not understand audio or timeout.")
                 return None
 
-    def speak(self, text):
-        self.engine.say(text)
-        self.engine.runAndWait()
+    def stop(self):
+        """Stop the speaking thread cleanly."""
+        self.speak_queue.put(None)
 
 class AssistantGUI:
     def __init__(self, root):
@@ -71,6 +96,14 @@ class AssistantGUI:
         self.animate()
         self.root.after(100, self.check_queue)
         threading.Thread(target=self.listen_loop, daemon=True).start()
+
+        # Handle window close
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+    def on_closing(self):
+        """Handle window close event to stop threads cleanly."""
+        self.voice_handler.stop()
+        self.root.destroy()
 
     def load_conversation_history(self):
         try:
@@ -183,7 +216,7 @@ class AssistantGUI:
         self.root.after(100, self.check_queue)
 
 def get_llm_response(query):
-    api_key = "your_api_key"  # Replace with your actual API key
+    api_key = "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"  # Replace with your actual API key
     if not api_key:
         print("Please set the GROQ_API_KEY environment variable.")
         return None
