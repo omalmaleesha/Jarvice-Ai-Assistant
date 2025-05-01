@@ -1,14 +1,18 @@
-def get_greeting():
-    """Generate a greeting based on the current time."""
-    current_time = datetime.datetime.now()
-    hour = current_time.hour
+from datetime import datetime
 
-    if hour < 12:
-        return "Good morning"
-    elif hour < 18:
-        return "Good afternoon"
+def get_greeting_message():
+    """
+    Returns a greeting message based on the current time of day.
+    """
+    current_hour = datetime.now().hour
+    if 5 <= current_hour < 12:
+        return "Good morning!"
+    elif 12 <= current_hour < 18:
+        return "Good afternoon!"
+    elif 18 <= current_hour < 22:
+        return "Good evening!"
     else:
-        return "Good evening"
+        return "Hello!"
 
 def get_current_time():
     """Return the current time formatted as a string."""
