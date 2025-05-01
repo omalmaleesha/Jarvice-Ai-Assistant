@@ -1,6 +1,6 @@
 # Configuration settings for the JARVIS assistant application
 
-API_KEY = "your_groq_api"  # Replace with your actual API key
+API_KEY = "your_api_key"  # Replace with your actual API key
 WINDOW_TITLE = "JARVIS Modern"
 WINDOW_SIZE = "500x400"
 BACKGROUND_COLOR = "#0e0e10"
