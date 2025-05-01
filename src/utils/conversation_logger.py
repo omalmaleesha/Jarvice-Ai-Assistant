@@ -1,3 +1,7 @@
+import datetime
+import json
+
+
 def log_conversation(query, response):
     timestamp = datetime.datetime.now().isoformat()
     entry = {
