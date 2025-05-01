@@ -1,108 +1,67 @@
-# JARVIS AI Assistant with Voice Bubble Animation 🎉📺
+# JARVIS Assistant
 
-Welcome to the **JARVIS AI Voice Assistant** project — a fully automated, real-time voice recognition assistant powered by **Groq LLM** (LLaMA 3) and **Tkinter GUI**, featuring futuristic **animated voice wave effects**! 🌟
+JARVIS is a modern voice assistant application that utilizes speech recognition and text-to-speech technologies to provide a seamless user experience. This project is designed to be modular, with separate components for the graphical user interface (GUI), voice handling, and utility functions.
 
-This project turns your computer into a smart assistant like Tony Stark's JARVIS — auto-listening, speaking, and beautifully visualizing sound waves.
+## Features
 
----
+- Voice recognition for user commands
+- Text-to-speech capabilities for responses
+- Animated speech bubble to indicate speaking status
+- Conversation history logging
+- Modular architecture for easy maintenance and enhancements
 
-## 🌐 Project Features
+## Project Structure
 
-- 🔊 **Auto Voice Listening** (no button clicks needed)
-- 🎧 **Voice Recognition** (powered by Google Speech Recognition)
-- 💡 **AI Response Generation** (using Groq LLaMA3-8B model)
-- 🌀 **Live Animated Voice Bars** inside the GUI (Waveform animation)
-- 📃 **Conversation History Logging** (saves your chats)
-- 🌪️ **Beautiful 3D Bubble Effect** while speaking
-- 🚀 **Lightweight and Fast** (built using Python Tkinter)
-- 🛡️ **SEO Optimized** structure for educational tutorials and AI projects
-
----
-
-## 👩‍💻 Technologies Used
-
-- **Python 3.9+**
-- **Tkinter** (Graphical User Interface)
-- **tkhtmlview** (HTML rendering inside Tkinter)
-- **SpeechRecognition** (Microphone input)
-- **Pyttsx3** (Text-to-Speech Engine)
-- **Groq API** (LLM based chatbot model: Llama3-8B)
-
----
-
-## 🚧 Setup Instructions
-
-1. **Clone the Repository**
-
-```bash
-git clone https://github.com/your-username/jarvis-voice-assistant.git
-cd jarvis-voice-assistant
+```
+jarvis-assistant
+├── src
+│   ├── gui
+│   │   ├── __init__.py
+│   │   ├── assistant_gui.py
+│   │   └── bubble_animation.py
+│   ├── voice
+│   │   ├── __init__.py
+│   │   ├── voice_handler.py
+│   │   └── speech_recognition.py
+│   ├── utils
+│   │   ├── __init__.py
+│   │   ├── conversation_logger.py
+│   │   ├── llm_api.py
+│   │   └── time_utils.py
+│   ├── main.py
+│   └── config.py
+├── requirements.txt
+├── .gitignore
+└── README.md
 ```
 
-2. **Install Required Libraries**
+## Installation
 
-```bash
-pip install tkhtmlview speechrecognition pyttsx3 requests
-```
+1. Clone the repository:
+   ```
+   git clone https://github.com/yourusername/jarvis-assistant.git
+   ```
+2. Navigate to the project directory:
+   ```
+   cd jarvis-assistant
+   ```
+3. Install the required dependencies:
+   ```
+   pip install -r requirements.txt
+   ```
 
-3. **Run the Application**
+## Usage
 
-```bash
-python jarvis.py
-```
+1. Run the application:
+   ```
+   python src/main.py
+   ```
+2. Follow the on-screen instructions to interact with the assistant.
 
-> ⚠️ Make sure your microphone is connected and working.
+## Contributing
 
----
+Contributions are welcome! Please feel free to submit a pull request or open an issue for any enhancements or bug fixes.
 
-## 🌈 Live Demo
+## License
 
-When you start the application:
-
-- JARVIS will auto-listen.
-- When you speak, colorful animated voice bars will appear.
-- JARVIS will answer your question by speaking out loud!
-
----
-
-- Jarvis AI Python Project
-- Python AI Assistant with Voice
-- Tkinter Animated Voice Bars
-- Real-time Voice Recognition Python
-- AI Chatbot Groq LLM Python
-- Create Your Own JARVIS with Python
-- Futuristic Python Projects 2025
-- Speech to Text AI Python
-- Groq LLaMA3 Voice Assistant
-- Python Tkinter Voice Visualization
-
----
-
-## 📈 Future Upgrades
-
-- 🔑 Wake Word Detection ("Hey Jarvis!")
-- 🌟 Neon Glow Voice Bars
-- 🧪 Whisper Model Support
-- 🌐 Web Dashboard Integration
-- 👩‍💻 Deploy on Raspberry Pi
-
----
-
-## 📢 License
-
-This project is licensed under the **MIT License**. Feel free to use and modify it!
-
-> 👉 Don't forget to star the repository if you find it helpful! ⭐
-
----
-
-## 🔗 Connect With Me
-
-- Mail me [-omalmaleesha03@gmail.com](mailto:-omalmaleesha03@gmail.com)
-
----
-
-# Let's build the future with AI and creativity! 🌟🚀
-
----
-
+This project is licensed under the MIT License. See the LICENSE file for more details.
