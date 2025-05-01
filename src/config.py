@@ -1,0 +1,14 @@
+# Configuration settings for the JARVIS assistant application
+
+API_KEY = "your_groq_api"  # Replace with your actual API key
+WINDOW_TITLE = "JARVIS Modern"
+WINDOW_SIZE = "500x400"
+BACKGROUND_COLOR = "#0e0e10"
+CANVAS_COLOR = "#1a1a2e"
+STATUS_LABEL_FONT = ("Poppins", 16)
+BUBBLE_COLOR_IDLE = "#4b367c"
+BUBBLE_COLOR_LISTENING = "#6441a5"
+BUBBLE_COLOR_SPEAKING = "#8964d1"
+BUBBLE_ANIMATION_SPEED = 0.1
+SPEECH_RATE = 140
+SPEECH_VOLUME = 1.0

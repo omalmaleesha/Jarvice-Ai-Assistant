@@ -1,0 +1,7 @@
+Flask==2.0.1
+requests==2.26.0
+speechrecognition==3.8.1
+pyttsx3==2.7
+tkinter==0.1.0
+numpy==1.21.2
+jsonschema==3.2.0
