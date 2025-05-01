@@ -1,5 +1,8 @@
+import requests
+
+
 def get_llm_response(query):
-    api_key = "your_groq_api"  # Replace with your actual API key
+    api_key = "your_api_key"  # Replace with your actual API key
     if not api_key:
         print("Please set the GROQ_API_KEY environment variable.")
         return None
