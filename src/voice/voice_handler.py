@@ -1,7 +1,12 @@
+import queue
+import threading
+import pyttsx3
+import speech_recognition as sr  # Correct import for speech recognition
+
 class VoiceHandler:
     def __init__(self, gui):
         self.gui = gui
-        self.recognizer = sr.Recognizer()
+        self.recognizer = sr.Recognizer()  # Use the correct recognizer from speech_recognition
         self.speak_queue = queue.Queue()
         threading.Thread(target=self.speak_loop, daemon=True).start()
 
@@ -14,8 +19,6 @@ class VoiceHandler:
                 break
         self.engine.setProperty('rate', 140)
         self.engine.setProperty('volume', 1.0)
-        self.engine.connect('started-utterance', self.on_start_utterance)
-        self.engine.connect('finished-utterance', self.on_finish_utterance)
         while True:
             text = self.speak_queue.get()
             if text is None:
@@ -33,16 +36,25 @@ class VoiceHandler:
         self.speak_queue.put(text)
 
     def listen(self):
-        with sr.Microphone() as source:
-            self.recognizer.adjust_for_ambient_noise(source, duration=0.5)
+        """
+        Listens to the microphone and returns the recognized text.
+        """
+        with sr.Microphone() as source:  # Use the correct Microphone class from speech_recognition
+            self.recognizer.adjust_for_ambient_noise(source, duration=1)
             print("Listening...")
             try:
                 audio = self.recognizer.listen(source, timeout=5, phrase_time_limit=10)
                 text = self.recognizer.recognize_google(audio)
                 print(f"You said: {text}")
                 return text
-            except (sr.UnknownValueError, sr.RequestError, sr.WaitTimeoutError):
-                print("Could not understand audio or timeout.")
+            except sr.UnknownValueError:
+                print("Could not understand the audio.")
+                return None
+            except sr.RequestError as e:
+                print(f"Could not request results from Google Speech Recognition service; {e}")
+                return None
+            except sr.WaitTimeoutError:
+                print("Listening timed out while waiting for phrase.")
                 return None
 
     def stop(self):
