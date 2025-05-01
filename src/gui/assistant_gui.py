@@ -1,11 +1,12 @@
 from tkinter import Tk, Label, Canvas, Entry, Button, Frame, Scrollbar, Text, END
 import threading
 import queue
-from .bubble_animation import BubbleAnimation
-from ..voice.voice_handler import VoiceHandler
-from ..utils.conversation_logger import log_conversation
-from ..utils.llm_api import get_llm_response
-from ..utils.time_utils import get_greeting_message
+import os  # Add this import for file operations
+from gui.bubble_animation import BubbleAnimation
+from voice.voice_handler import VoiceHandler
+from utils.conversation_logger import log_conversation, load_conversation_history  # Import the correct function
+from utils.llm_api import get_llm_response
+from utils.time_utils import get_greeting_message
 
 class AssistantGUI:
     def __init__(self, root: Tk):
@@ -39,6 +40,11 @@ class AssistantGUI:
                                   activebackground="#8964d1", command=self.on_send_click)
         self.send_button.pack(side="right", padx=10)
 
+        # Add a "Listen" button
+        self.listen_button = Button(self.root, text="Listen", font=("Poppins", 12), bg="#6441a5", fg="white",
+                                    activebackground="#8964d1", command=self.on_listen_click)
+        self.listen_button.pack(pady=10)
+
         # Status label
         self.status_label = Label(self.root, text="Ready", font=("Poppins", 12), bg="#1e1e2f", fg="white")
         self.status_label.pack(pady=5)
@@ -62,7 +68,7 @@ class AssistantGUI:
         self.root.destroy()
 
     def load_conversation_history(self):
-        return log_conversation.load_history()
+        return load_conversation_history()  # Call the correct function
 
     def startup_greeting(self):
         message = get_greeting_message()
@@ -87,9 +93,39 @@ class AssistantGUI:
             log_conversation(query, response)
             self.voice_handler.speak(response)
             self.root.quit()
+        elif "create a text file" in query.lower():
+            self.create_text_file()
+        elif "delete the text file" in query.lower():
+            self.delete_text_file()
         else:
             self.status_label.config(text="Processing...")
             threading.Thread(target=self.get_response, args=(query,), daemon=True).start()
+
+    def create_text_file(self):
+        directory = r"C:\icet\text file generate"
+        os.makedirs(directory, exist_ok=True)  # Ensure the directory exists
+        file_path = os.path.join(directory, "generated_file.txt")
+        try:
+            with open(file_path, "w") as file:
+                file.write("This is a generated text file.")
+            response = f"Text file created at {file_path}."
+        except Exception as e:
+            response = f"Failed to create text file: {e}"
+        self.display_message("JARVIS", response)
+        self.voice_handler.speak(response)
+
+    def delete_text_file(self):
+        file_path = r"C:\icet\text file generate\generated_file.txt"
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+                response = "Text file deleted successfully."
+            except Exception as e:
+                response = f"Failed to delete text file: {e}"
+        else:
+            response = "No text file found to delete."
+        self.display_message("JARVIS", response)
+        self.voice_handler.speak(response)
 
     def get_response(self, query):
         query_lower = query.lower()
@@ -120,3 +156,44 @@ class AssistantGUI:
         self.chat_display.insert(END, f"{sender}: {message}\n")
         self.chat_display.config(state="disabled")
         self.chat_display.see(END)
+
+    def listen_loop(self):
+        """
+        Continuously listens for user input via voice commands.
+        """
+        while True:
+            try:
+                self.state = "listening"
+                self.status_label.config(text="Listening...")
+                self.bubble_animation.animate("listening")
+                query = self.voice_handler.listen()
+                if query:
+                    self.process_query(query)
+                else:
+                    self.status_label.config(text="Ready")
+                    self.state = "idle"
+            except Exception as e:
+                print(f"Error in listen_loop: {e}")
+                self.status_label.config(text="Error occurred")
+                self.state = "idle"
+
+    def on_listen_click(self):
+        """
+        Triggered when the "Listen" button is clicked.
+        Activates listening and starts the animation.
+        """
+        self.state = "listening"
+        self.status_label.config(text="Listening...")
+        self.bubble_animation.animate("listening")
+        threading.Thread(target=self.start_listening, daemon=True).start()
+
+    def start_listening(self):
+        """
+        Starts the voice recognition process.
+        """
+        query = self.voice_handler.listen()
+        if query:
+            self.process_query(query)
+        else:
+            self.status_label.config(text="Ready")
+            self.state = "idle"
