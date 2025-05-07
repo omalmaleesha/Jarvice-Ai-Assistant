@@ -1,10 +1,10 @@
 from tkinter import Tk, Label, Canvas, Entry, Button, Frame, Scrollbar, Text, END
 import threading
 import queue
-import os  # Add this import for file operations
+import os
 from gui.bubble_animation import BubbleAnimation
 from voice.voice_handler import VoiceHandler
-from utils.conversation_logger import log_conversation, load_conversation_history  # Import the correct function
+from utils.conversation_logger import log_conversation, load_conversation_history
 from utils.llm_api import get_llm_response
 from utils.time_utils import get_greeting_message
 
@@ -50,8 +50,10 @@ class AssistantGUI:
         self.status_label.pack(pady=5)
 
         # Initialize components
-        self.state = "idle"  # idle, listening, speaking
-        self.bubble_animation = BubbleAnimation(Canvas(self.root))  # Placeholder for animation
+        self.state = 0  # 0: idle, 1: waiting for file name, 2: waiting for file type
+        self.file_name = ""
+        self.file_type = ""
+        self.bubble_animation = BubbleAnimation(Canvas(self.root))
         self.voice_handler = VoiceHandler(self)
         self.response_queue = queue.Queue()
 
@@ -68,7 +70,7 @@ class AssistantGUI:
         self.root.destroy()
 
     def load_conversation_history(self):
-        return load_conversation_history()  # Call the correct function
+        return load_conversation_history()
 
     def startup_greeting(self):
         message = get_greeting_message()
@@ -86,24 +88,71 @@ class AssistantGUI:
 
     def process_query(self, query):
         self.display_message("You", query)
-        if "exit" in query.lower() or "goodbye" in query.lower():
-            self.status_label.config(text="Exiting...")
-            response = "Goodbye, sir."
+        # Handle cancel command at any state
+        if "cancel" in query.lower() or "stop" in query.lower():
+            if self.state != 0:
+                self.state = 0
+                response = "File creation cancelled."
+            else:
+                response = "No operation to cancel."
             self.display_message("JARVIS", response)
-            log_conversation(query, response)
             self.voice_handler.speak(response)
-            self.root.quit()
-        elif "create a text file" in query.lower():
-            self.create_text_file()
-        elif "delete the text file" in query.lower():
-            self.delete_text_file()
-        else:
-            self.status_label.config(text="Processing...")
-            threading.Thread(target=self.get_response, args=(query,), daemon=True).start()
+            self.status_label.config(text="Ready")
+            return
+
+        if self.state == 0:
+            if "create file" in query.lower():
+                self.state = 1
+                response = "Please provide the file name."
+                self.display_message("JARVIS", response)
+                self.voice_handler.speak(response)
+                self.status_label.config(text="Waiting for file name...")
+            elif "exit" in query.lower() or "goodbye" in query.lower():
+                self.status_label.config(text="Exiting...")
+                response = "Goodbye, sir."
+                self.display_message("JARVIS", response)
+                log_conversation(query, response)
+                self.voice_handler.speak(response)
+                self.root.quit()
+            elif "create a text file" in query.lower():
+                self.create_text_file()
+            elif "delete the text file" in query.lower():
+                self.delete_text_file()
+            else:
+                self.status_label.config(text="Processing...")
+                threading.Thread(target=self.get_response, args=(query,), daemon=True).start()
+        elif self.state == 1:
+            self.file_name = query.strip()
+            self.state = 2
+            response = f"You said the file name is '{self.file_name}'. Now, please provide the file type, like 'txt' or 'doc'."
+            self.display_message("JARVIS", response)
+            self.voice_handler.speak(response)
+            self.status_label.config(text="Waiting for file type...")
+        elif self.state == 2:
+            self.file_type = query.strip()
+            response = f"You said the file type is '{self.file_type}'. Creating the file '{self.file_name}.{self.file_type}'."
+            self.display_message("JARVIS", response)
+            self.voice_handler.speak(response)
+            self.create_file()
+            self.state = 0
+            self.status_label.config(text="Ready")
+
+    def create_file(self):
+        directory = r"C:\icet\text file generate"
+        os.makedirs(directory, exist_ok=True)
+        file_path = os.path.join(directory, f"{self.file_name}.{self.file_type}")
+        try:
+            with open(file_path, "w") as file:
+                file.write("This is a generated file.")
+            response = f"File created at {file_path}."
+        except Exception as e:
+            response = f"Failed to create file: {e}"
+        self.display_message("JARVIS", response)
+        self.voice_handler.speak(response)
 
     def create_text_file(self):
         directory = r"C:\icet\text file generate"
-        os.makedirs(directory, exist_ok=True)  # Ensure the directory exists
+        os.makedirs(directory, exist_ok=True)
         file_path = os.path.join(directory, "generated_file.txt")
         try:
             with open(file_path, "w") as file:
@@ -146,7 +195,7 @@ class AssistantGUI:
             self.display_message("JARVIS", response)
             self.voice_handler.speak(response)
             self.status_label.config(text="Ready")
-            self.state = "idle"
+            self.state = 0
         except queue.Empty:
             pass
         self.root.after(100, self.check_queue)
@@ -156,14 +205,11 @@ class AssistantGUI:
         self.chat_display.insert(END, f"{sender}: {message}\n")
         self.chat_display.config(state="disabled")
         self.chat_display.see(END)
+        print(f"{sender}: {message}")  # Log to terminal
 
     def listen_loop(self):
-        """
-        Continuously listens for user input via voice commands.
-        """
         while True:
             try:
-                self.state = "listening"
                 self.status_label.config(text="Listening...")
                 self.bubble_animation.animate("listening")
                 query = self.voice_handler.listen()
@@ -171,29 +217,18 @@ class AssistantGUI:
                     self.process_query(query)
                 else:
                     self.status_label.config(text="Ready")
-                    self.state = "idle"
             except Exception as e:
                 print(f"Error in listen_loop: {e}")
                 self.status_label.config(text="Error occurred")
-                self.state = "idle"
 
     def on_listen_click(self):
-        """
-        Triggered when the "Listen" button is clicked.
-        Activates listening and starts the animation.
-        """
-        self.state = "listening"
         self.status_label.config(text="Listening...")
         self.bubble_animation.animate("listening")
         threading.Thread(target=self.start_listening, daemon=True).start()
 
     def start_listening(self):
-        """
-        Starts the voice recognition process.
-        """
         query = self.voice_handler.listen()
         if query:
             self.process_query(query)
         else:
             self.status_label.config(text="Ready")
-            self.state = "idle"
