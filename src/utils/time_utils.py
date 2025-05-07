@@ -16,4 +16,4 @@ def get_greeting_message():
 
 def get_current_time():
     """Return the current time formatted as a string."""
-    return datetime.datetime.now().strftime("%I:%M %p")
+    return datetime.now().strftime("%I:%M %p")
