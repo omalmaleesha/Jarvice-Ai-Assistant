@@ -50,12 +50,14 @@ class AssistantGUI:
         self.status_label.pack(pady=5)
 
         # Initialize components
-        self.state = 0  # 0: idle, 1: waiting for file name, 2: waiting for file type
+        self.state = 0  # 0: idle, 1: waiting for file name, 2: waiting for file type, 3: writing to file
         self.file_name = ""
         self.file_type = ""
+        self.current_file_path = None
+        self.file_handle = None
         self.bubble_animation = BubbleAnimation(Canvas(self.root))
         self.voice_handler = VoiceHandler(self)
-        self.response_queue = queue.Queue()
+        self.action_queue = queue.Queue()
 
         self.conversation_history = self.load_conversation_history()
         self.startup_greeting()
@@ -74,8 +76,8 @@ class AssistantGUI:
 
     def startup_greeting(self):
         message = get_greeting_message()
-        self.display_message("JARVIS", message)
-        self.voice_handler.speak(message)
+        self.action_queue.put(("display", ("JARVIS", message)))
+        self.action_queue.put(("speak", message))
 
     def on_user_input(self, event=None):
         query = self.user_input.get().strip()
@@ -87,55 +89,96 @@ class AssistantGUI:
         self.on_user_input()
 
     def process_query(self, query):
-        self.display_message("You", query)
-        # Handle cancel command at any state
+        self.action_queue.put(("display", ("You", query)))
         if "cancel" in query.lower() or "stop" in query.lower():
             if self.state != 0:
                 self.state = 0
-                response = "File creation cancelled."
+                if self.state == 3:
+                    self.close_file()
+                response = "Operation cancelled."
+                self.action_queue.put(("display", ("JARVIS", response)))
+                self.action_queue.put(("speak", response))
+                self.action_queue.put(("update_status", "Ready"))
             else:
                 response = "No operation to cancel."
-            self.display_message("JARVIS", response)
-            self.voice_handler.speak(response)
-            self.status_label.config(text="Ready")
+                self.action_queue.put(("display", ("JARVIS", response)))
+                self.action_queue.put(("speak", response))
             return
 
         if self.state == 0:
             if "create file" in query.lower():
                 self.state = 1
                 response = "Please provide the file name."
-                self.display_message("JARVIS", response)
-                self.voice_handler.speak(response)
-                self.status_label.config(text="Waiting for file name...")
+                self.action_queue.put(("display", ("JARVIS", response)))
+                self.action_queue.put(("speak", response))
+                self.action_queue.put(("update_status", "Waiting for file name..."))
+            elif "open the created file" in query.lower():
+                if self.current_file_path:
+                    if self.open_file_for_writing():
+                        self.state = 3
+                        response = f"Opened file {self.current_file_path} for writing. You can start dictating paragraphs or say 'stop writing' to exit."
+                        self.action_queue.put(("display", ("JARVIS", response)))
+                        self.action_queue.put(("speak", response))
+                        self.action_queue.put(("update_status", "Writing to file..."))
+                    else:
+                        response = "Failed to open the file for writing."
+                        self.action_queue.put(("display", ("JARVIS", response)))
+                        self.action_queue.put(("speak", response))
+                else:
+                    response = "No file has been created yet."
+                    self.action_queue.put(("display", ("JARVIS", response)))
+                    self.action_queue.put(("speak", response))
             elif "exit" in query.lower() or "goodbye" in query.lower():
-                self.status_label.config(text="Exiting...")
+                self.action_queue.put(("update_status", "Exiting..."))
                 response = "Goodbye, sir."
-                self.display_message("JARVIS", response)
+                self.action_queue.put(("display", ("JARVIS", response)))
                 log_conversation(query, response)
-                self.voice_handler.speak(response)
+                self.action_queue.put(("speak", response))
                 self.root.quit()
             elif "create a text file" in query.lower():
                 self.create_text_file()
             elif "delete the text file" in query.lower():
                 self.delete_text_file()
             else:
-                self.status_label.config(text="Processing...")
+                self.action_queue.put(("update_status", "Processing..."))
                 threading.Thread(target=self.get_response, args=(query,), daemon=True).start()
         elif self.state == 1:
             self.file_name = query.strip()
             self.state = 2
             response = f"You said the file name is '{self.file_name}'. Now, please provide the file type, like 'txt' or 'doc'."
-            self.display_message("JARVIS", response)
-            self.voice_handler.speak(response)
-            self.status_label.config(text="Waiting for file type...")
+            self.action_queue.put(("display", ("JARVIS", response)))
+            self.action_queue.put(("speak", response))
+            self.action_queue.put(("update_status", "Waiting for file type..."))
         elif self.state == 2:
             self.file_type = query.strip()
             response = f"You said the file type is '{self.file_type}'. Creating the file '{self.file_name}.{self.file_type}'."
-            self.display_message("JARVIS", response)
-            self.voice_handler.speak(response)
+            self.action_queue.put(("display", ("JARVIS", response)))
+            self.action_queue.put(("speak", response))
             self.create_file()
             self.state = 0
-            self.status_label.config(text="Ready")
+            self.action_queue.put(("update_status", "Ready"))
+        elif self.state == 3:
+            if "stop writing" in query.lower():
+                self.state = 0
+                self.close_file()
+                response = "Stopped writing to file."
+                self.action_queue.put(("display", ("JARVIS", response)))
+                self.action_queue.put(("speak", response))
+                self.action_queue.put(("update_status", "Ready"))
+            else:
+                enhanced_paragraph = self.enhance_paragraph(query)
+                self.action_queue.put(("display", ("JARVIS", f"Enhanced paragraph: {enhanced_paragraph}")))
+                self.action_queue.put(("speak", f"Enhanced paragraph: {enhanced_paragraph}. Do you want to write this to the file?"))
+                # Listen for confirmation
+                confirmation = self.voice_handler.listen()
+                if confirmation and "yes" in confirmation.lower():
+                    self.write_to_file(enhanced_paragraph)
+                    response = "Paragraph written to file."
+                else:
+                    response = "Paragraph discarded."
+                self.action_queue.put(("display", ("JARVIS", response)))
+                self.action_queue.put(("speak", response))
+                # Stay in state 3 to listen for the next paragraph
 
     def create_file(self):
         directory = r"C:\icet\text file generate"
@@ -144,11 +187,44 @@ class AssistantGUI:
         try:
             with open(file_path, "w") as file:
                 file.write("This is a generated file.")
+            self.current_file_path = file_path
             response = f"File created at {file_path}."
         except Exception as e:
             response = f"Failed to create file: {e}"
-        self.display_message("JARVIS", response)
-        self.voice_handler.speak(response)
+        self.action_queue.put(("display", ("JARVIS", response)))
+        self.action_queue.put(("speak", response))
+
+    def open_file_for_writing(self):
+        if self.current_file_path and os.path.exists(self.current_file_path):
+            try:
+                self.file_handle = open(self.current_file_path, "a")
+                return True
+            except Exception as e:
+                print(f"Failed to open file: {e}")
+                return False
+        else:
+            return False
+
+    def close_file(self):
+        if hasattr(self, 'file_handle') and self.file_handle:
+            self.file_handle.close()
+            self.file_handle = None
+
+    def enhance_paragraph(self, paragraph):
+        prompt = f"Enhance the following paragraph: {paragraph}"
+        response = get_llm_response(prompt)
+        if response:
+            return response
+        else:
+            return paragraph  # Fallback to original if enhancement fails
+
+    def write_to_file(self, text):
+        if hasattr(self, 'file_handle') and self.file_handle:
+            try:
+                self.file_handle.write(text + "\n")
+                self.file_handle.flush()
+            except Exception as e:
+                print(f"Failed to write to file: {e}")
 
     def create_text_file(self):
         directory = r"C:\icet\text file generate"
@@ -160,8 +236,8 @@ class AssistantGUI:
             response = f"Text file created at {file_path}."
         except Exception as e:
             response = f"Failed to create text file: {e}"
-        self.display_message("JARVIS", response)
-        self.voice_handler.speak(response)
+        self.action_queue.put(("display", ("JARVIS", response)))
+        self.action_queue.put(("speak", response))
 
     def delete_text_file(self):
         file_path = r"C:\icet\text file generate\generated_file.txt"
@@ -173,8 +249,8 @@ class AssistantGUI:
                 response = f"Failed to delete text file: {e}"
         else:
             response = "No text file found to delete."
-        self.display_message("JARVIS", response)
-        self.voice_handler.speak(response)
+        self.action_queue.put(("display", ("JARVIS", response)))
+        self.action_queue.put(("speak", response))
 
     def get_response(self, query):
         query_lower = query.lower()
@@ -187,42 +263,47 @@ class AssistantGUI:
                 log_conversation(query, response)
             else:
                 response = "I'm sorry, I couldn't process that."
-        self.response_queue.put((query, response))
+        self.action_queue.put(("display", ("JARVIS", response)))
+        self.action_queue.put(("speak", response))
+        self.action_queue.put(("update_status", "Ready"))
 
     def check_queue(self):
         try:
-            query, response = self.response_queue.get_nowait()
-            self.display_message("JARVIS", response)
-            self.voice_handler.speak(response)
-            self.status_label.config(text="Ready")
-            self.state = 0
+            while True:
+                action = self.action_queue.get_nowait()
+                if action[0] == "display":
+                    sender, message = action[1]
+                    self.chat_display.config(state="normal")
+                    self.chat_display.insert(END, f"{sender}: {message}\n")
+                    self.chat_display.config(state="disabled")
+                    self.chat_display.see(END)
+                    print(f"{sender}: {message}")  # Log to terminal
+                elif action[0] == "speak":
+                    text = action[1]
+                    self.voice_handler.speak(text)
+                elif action[0] == "update_status":
+                    text = action[1]
+                    self.status_label.config(text=text)
         except queue.Empty:
             pass
         self.root.after(100, self.check_queue)
 
-    def display_message(self, sender, message):
-        self.chat_display.config(state="normal")
-        self.chat_display.insert(END, f"{sender}: {message}\n")
-        self.chat_display.config(state="disabled")
-        self.chat_display.see(END)
-        print(f"{sender}: {message}")  # Log to terminal
-
     def listen_loop(self):
         while True:
             try:
-                self.status_label.config(text="Listening...")
+                self.action_queue.put(("update_status", "Listening..."))
                 self.bubble_animation.animate("listening")
                 query = self.voice_handler.listen()
                 if query:
                     self.process_query(query)
                 else:
-                    self.status_label.config(text="Ready")
+                    self.action_queue.put(("update_status", "Ready"))
             except Exception as e:
                 print(f"Error in listen_loop: {e}")
-                self.status_label.config(text="Error occurred")
+                self.action_queue.put(("update_status", "Error occurred"))
 
     def on_listen_click(self):
-        self.status_label.config(text="Listening...")
+        self.action_queue.put(("update_status", "Listening..."))
         self.bubble_animation.animate("listening")
         threading.Thread(target=self.start_listening, daemon=True).start()
 
@@ -231,4 +312,9 @@ class AssistantGUI:
         if query:
             self.process_query(query)
         else:
-            self.status_label.config(text="Ready")
+            self.action_queue.put(("update_status", "Ready"))
+
+if __name__ == "__main__":
+    root = Tk()
+    app = AssistantGUI(root)
+    root.mainloop()
