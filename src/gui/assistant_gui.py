@@ -1,8 +1,7 @@
-from tkinter import Tk, Label, Canvas, Entry, Button, Frame, Scrollbar, Text, END
+from tkinter import Tk, Label, Entry, Frame, Scrollbar, Text, END
 import threading
 import queue
 import os
-from gui.bubble_animation import BubbleAnimation
 from voice.voice_handler import VoiceHandler
 from utils.conversation_logger import log_conversation, load_conversation_history
 from utils.llm_api import get_llm_response
@@ -11,8 +10,8 @@ from utils.time_utils import get_greeting_message
 class AssistantGUI:
     def __init__(self, root: Tk):
         self.root = root
-        self.root.title("JARVIS Modern")
-        self.root.configure(bg="#000000")  # Black background
+        self.root.title("JARVIS Command Prompt")
+        self.root.configure(bg="#000000")
         self.root.geometry("600x500")
         self.root.resizable(False, False)
 
@@ -20,11 +19,11 @@ class AssistantGUI:
         self.chat_frame = Frame(self.root, bg="#000000")
         self.chat_frame.pack(pady=10, fill="both", expand=True)
 
-        self.scrollbar = Scrollbar(self.chat_frame, bg="#000000", troughcolor="#000000")
+        self.scrollbar = Scrollbar(self.chat_frame, bg="#FFFFFF", troughcolor="#000000", activebackground="#CCCCCC", width=16)
         self.scrollbar.pack(side="right", fill="y")
 
         self.chat_display = Text(self.chat_frame, wrap="word", yscrollcommand=self.scrollbar.set,
-                                 bg="#000000", fg="#00FF00", font=("Poppins", 12), state="disabled")  # Green text on black background
+                                 bg="#000000", fg="#FFFFFF", font=("Consolas", 12), state="disabled", relief="flat", bd=0)
         self.chat_display.pack(side="left", fill="both", expand=True)
         self.scrollbar.config(command=self.chat_display.yview)
 
@@ -32,21 +31,13 @@ class AssistantGUI:
         self.input_frame = Frame(self.root, bg="#000000")
         self.input_frame.pack(fill="x", pady=10)
 
-        self.user_input = Entry(self.input_frame, font=("Poppins", 14), bg="#333333", fg="#00FF00", insertbackground="#00FF00")  # Dark gray background, green text
+        self.user_input = Entry(self.input_frame, font=("Consolas", 14), bg="#000000", fg="#FFFFFF", insertbackground="#FFFFFF", bd=0, relief="flat", highlightthickness=0)
         self.user_input.pack(side="left", fill="x", expand=True, padx=10, pady=5)
         self.user_input.bind("<Return>", self.on_user_input)
-
-        self.send_button = Button(self.input_frame, text="Send", font=("Poppins", 12), bg="#00FF00", fg="#000000",
-                                  activebackground="#00CC00", command=self.on_send_click)  # Green button with black text
-        self.send_button.pack(side="right", padx=10)
-
-        # Add a "Listen" button
-        self.listen_button = Button(self.root, text="Listen", font=("Poppins", 12), bg="#00FF00", fg="#000000",
-                                    activebackground="#00CC00", command=self.on_listen_click)  # Green button with black text
-        self.listen_button.pack(pady=10)
+        self.user_input.focus_set()
 
         # Status label
-        self.status_label = Label(self.root, text="Ready", font=("Poppins", 12), bg="#000000", fg="#00FF00")  # Green text on black background
+        self.status_label = Label(self.root, text="Ready", font=("Consolas", 12), bg="#000000", fg="#FFFFFF")
         self.status_label.pack(pady=5)
 
         # Initialize components
@@ -56,7 +47,6 @@ class AssistantGUI:
         self.file_type = ""
         self.current_file_path = None
         self.file_handle = None
-        self.bubble_animation = BubbleAnimation(Canvas(self.root, bg="#000000"))  # Black background for canvas
         self.voice_handler = VoiceHandler(self)
         self.action_queue = queue.Queue()
 
@@ -77,7 +67,7 @@ class AssistantGUI:
 
     def startup_greeting(self):
         message = get_greeting_message()
-        self.action_queue.put(("display", ("JARVIS", message)))
+        self.action_queue.put(("display", ("", message)))
         self.action_queue.put(("speak", message))
 
     def on_user_input(self, event=None):
@@ -86,11 +76,8 @@ class AssistantGUI:
             self.process_query(query)
             self.user_input.delete(0, END)
 
-    def on_send_click(self):
-        self.on_user_input()
-
     def process_query(self, query):
-        self.action_queue.put(("display", ("You", query)))
+        self.action_queue.put(("display", (">", query)))
 
         if "stop" in query.lower() or "enough" in query.lower():
             self.paused = True
@@ -104,7 +91,7 @@ class AssistantGUI:
                 self.close_file()
                 self.state = 0
             response = "Assistant paused. Say 'start' to resume."
-            self.action_queue.put(("display", ("JARVIS", response)))
+            self.action_queue.put(("display", ("", response)))
             self.action_queue.put(("speak", response))
             self.action_queue.put(("update_status", "Paused"))
 
@@ -112,12 +99,12 @@ class AssistantGUI:
             if self.paused:
                 self.paused = False
                 response = "Assistant resumed."
-                self.action_queue.put(("display", ("JARVIS", response)))
+                self.action_queue.put(("display", ("", response)))
                 self.action_queue.put(("speak", response))
                 self.action_queue.put(("update_status", "Ready"))
             else:
                 response = "Assistant is already active."
-                self.action_queue.put(("display", ("JARVIS", response)))
+                self.action_queue.put(("display", ("", response)))
                 self.action_queue.put(("speak", response))
 
         else:
@@ -129,7 +116,7 @@ class AssistantGUI:
                 if "create file" in query.lower():
                     self.state = 1
                     response = "Please provide the file name."
-                    self.action_queue.put(("display", ("JARVIS", response)))
+                    self.action_queue.put(("display", ("", response)))
                     self.action_queue.put(("speak", response))
                     self.action_queue.put(("update_status", "Waiting for file name..."))
                 elif "open the created file" in query.lower():
@@ -137,21 +124,21 @@ class AssistantGUI:
                         if self.open_file_for_writing():
                             self.state = 3
                             response = f"Opened file {self.current_file_path} for writing. You can start dictating paragraphs or say 'stop writing' to exit."
-                            self.action_queue.put(("display", ("JARVIS", response)))
+                            self.action_queue.put(("display", ("", response)))
                             self.action_queue.put(("speak", response))
                             self.action_queue.put(("update_status", "Writing to file..."))
                         else:
                             response = "Failed to open the file for writing."
-                            self.action_queue.put(("display", ("JARVIS", response)))
+                            self.action_queue.put(("display", ("", response)))
                             self.action_queue.put(("speak", response))
                     else:
                         response = "No file has been created yet."
-                        self.action_queue.put(("display", ("JARVIS", response)))
+                        self.action_queue.put(("display", ("", response)))
                         self.action_queue.put(("speak", response))
                 elif "exit" in query.lower() or "goodbye" in query.lower():
                     self.action_queue.put(("update_status", "Exiting..."))
                     response = "Goodbye, sir."
-                    self.action_queue.put(("display", ("JARVIS", response)))
+                    self.action_queue.put(("display", ("", response)))
                     log_conversation(query, response)
                     self.action_queue.put(("speak", response))
                     self.root.quit()
@@ -166,13 +153,13 @@ class AssistantGUI:
                 self.file_name = query.strip()
                 self.state = 2
                 response = f"You said the file name is '{self.file_name}'. Now, please provide the file type, like 'txt' or 'doc'."
-                self.action_queue.put(("display", ("JARVIS", response)))
+                self.action_queue.put(("display", ("", response)))
                 self.action_queue.put(("speak", response))
                 self.action_queue.put(("update_status", "Waiting for file type..."))
             elif self.state == 2:
                 self.file_type = query.strip()
                 response = f"You said the file type is '{self.file_type}'. Creating the file '{self.file_name}.{self.file_type}'."
-                self.action_queue.put(("display", ("JARVIS", response)))
+                self.action_queue.put(("display", ("", response)))
                 self.action_queue.put(("speak", response))
                 self.create_file()
                 self.state = 0
@@ -182,12 +169,12 @@ class AssistantGUI:
                     self.state = 0
                     self.close_file()
                     response = "Stopped writing to file."
-                    self.action_queue.put(("display", ("JARVIS", response)))
+                    self.action_queue.put(("display", ("", response)))
                     self.action_queue.put(("speak", response))
                     self.action_queue.put(("update_status", "Ready"))
                 else:
                     enhanced_paragraph = self.enhance_paragraph(query)
-                    self.action_queue.put(("display", ("JARVIS", f"Enhanced paragraph: {enhanced_paragraph}")))
+                    self.action_queue.put(("display", ("", f"Enhanced paragraph: {enhanced_paragraph}")))
                     self.action_queue.put(("speak", f"Enhanced paragraph: {enhanced_paragraph}. Do you want to write this to the file?"))
                     # Listen for confirmation
                     confirmation = self.voice_handler.listen()
@@ -196,7 +183,7 @@ class AssistantGUI:
                         response = "Paragraph written to file."
                     else:
                         response = "Paragraph discarded."
-                    self.action_queue.put(("display", ("JARVIS", response)))
+                    self.action_queue.put(("display", ("", response)))
                     self.action_queue.put(("speak", response))
                     # Stay in state 3 to listen for the next paragraph
 
@@ -211,7 +198,7 @@ class AssistantGUI:
             response = f"File created at {file_path}."
         except Exception as e:
             response = f"Failed to create file: {e}"
-        self.action_queue.put(("display", ("JARVIS", response)))
+        self.action_queue.put(("display", ("", response)))
         self.action_queue.put(("speak", response))
 
     def open_file_for_writing(self):
@@ -256,7 +243,7 @@ class AssistantGUI:
             response = f"Text file created at {file_path}."
         except Exception as e:
             response = f"Failed to create text file: {e}"
-        self.action_queue.put(("display", ("JARVIS", response)))
+        self.action_queue.put(("display", ("", response)))
         self.action_queue.put(("speak", response))
 
     def delete_text_file(self):
@@ -269,7 +256,7 @@ class AssistantGUI:
                 response = f"Failed to delete text file: {e}"
         else:
             response = "No text file found to delete."
-        self.action_queue.put(("display", ("JARVIS", response)))
+        self.action_queue.put(("display", ("", response)))
         self.action_queue.put(("speak", response))
 
     def get_response(self, query):
@@ -283,7 +270,7 @@ class AssistantGUI:
                 log_conversation(query, response)
             else:
                 response = "I'm sorry, I couldn't process that."
-        self.action_queue.put(("display", ("JARVIS", response)))
+        self.action_queue.put(("display", ("", response)))
         self.action_queue.put(("speak", response))
         self.action_queue.put(("update_status", "Ready"))
 
@@ -294,10 +281,13 @@ class AssistantGUI:
                 if action[0] == "display":
                     sender, message = action[1]
                     self.chat_display.config(state="normal")
-                    self.chat_display.insert(END, f"{sender}: {message}\n")
+                    if sender == ">":
+                        self.chat_display.insert(END, f"> {message}\n")
+                    else:
+                        self.chat_display.insert(END, f"{message}\n")
                     self.chat_display.config(state="disabled")
                     self.chat_display.see(END)
-                    print(f"{sender}: {message}")  # Log to terminal
+                    print(f"{sender}{message}")  # Log to terminal
                 elif action[0] == "speak":
                     text = action[1]
                     self.voice_handler.speak(text)
@@ -312,7 +302,6 @@ class AssistantGUI:
         while True:
             try:
                 self.action_queue.put(("update_status", "Listening..."))
-                self.bubble_animation.animate("listening")
                 query = self.voice_handler.listen()
                 if query:
                     self.process_query(query)
@@ -321,18 +310,6 @@ class AssistantGUI:
             except Exception as e:
                 print(f"Error in listen_loop: {e}")
                 self.action_queue.put(("update_status", "Error occurred"))
-
-    def on_listen_click(self):
-        self.action_queue.put(("update_status", "Listening..."))
-        self.bubble_animation.animate("listening")
-        threading.Thread(target=self.start_listening, daemon=True).start()
-
-    def start_listening(self):
-        query = self.voice_handler.listen()
-        if query:
-            self.process_query(query)
-        else:
-            self.action_queue.put(("update_status", "Ready"))
 
 if __name__ == "__main__":
     root = Tk()
